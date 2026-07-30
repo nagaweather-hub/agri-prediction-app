@@ -71,97 +71,99 @@ if "lat" not in st.session_state or "lon" not in st.session_state:
     st.session_state["location_label"] = "長崎県諫早市"
 
 # ---------------------------------------------------------
-# サイドバー：品目選択 ＆ 条件設定
+# サイドバー：品目選択 ＆ 条件設定（st.formで囲むことでボタンを押すまで再実行を防ぐ）
 # ---------------------------------------------------------
 st.sidebar.header("🌱 予測対象の選択")
 
-crop_category = st.sidebar.selectbox(
-    "品目カテゴリ",
-    [
-        "水稲",
-        "麦",
-        "タマネギべと病",
-        "バレイショ（春作マルチ）",
-        "びわ（収穫予測）",
-        "ナシマルカイガラムシ（露地ビワ）",
-        "レタス（収穫予測）",
-    ],
-)
-
-st.sidebar.divider()
-st.sidebar.header("⚙️ 条件設定")
-
 current_year = datetime.date.today().year
-
-# 品目ごとの動的入力フォーム
 inputs = {}
-if crop_category == "水稲":
-  inputs["variety"] = st.sidebar.selectbox(
-      "品種", list(RICE_VARIETY_PARAMS.keys())
-  )
-  inputs["start_date"] = st.sidebar.date_input(
-      "移植日（田植え日）", value=datetime.date(current_year, 4, 15)
+
+with st.sidebar.form("prediction_form"):
+  crop_category = st.selectbox(
+      "品目カテゴリ",
+      [
+          "水稲",
+          "麦",
+          "タマネギべと病",
+          "バレイショ（春作マルチ）",
+          "びわ（収穫予測）",
+          "ナシマルカイガラムシ（露地ビワ）",
+          "レタス（収穫予測）",
+      ],
   )
 
-elif crop_category == "麦":
-  inputs["variety"] = st.sidebar.selectbox(
-      "品種", list(WHEAT_VARIETY_PARAMS.keys())
-  )
-  inputs["start_date"] = st.sidebar.date_input(
-      "調査日", value=datetime.date(current_year, 2, 1)
-  )
-  inputs["young_spike_length"] = st.sidebar.number_input(
-      "主稈幼穂長 (cm)", min_value=0.1, value=1.0, step=0.1
-  )
+  st.divider()
+  st.markdown("### ⚙️ 条件設定")
 
-elif crop_category == "タマネギべと病":
-  inputs["start_date"] = st.sidebar.date_input(
-      "定植日", value=datetime.date(current_year, 12, 5)
-  )
-
-elif crop_category == "バレイショ（春作マルチ）":
-  inputs["variety"] = st.sidebar.selectbox(
-      "品種", list(POTATO_VARIETY_PARAMS.keys())
-  )
-  inputs["start_date"] = st.sidebar.date_input(
-      "出芽日", value=datetime.date(current_year, 2, 25)
-  )
-
-elif crop_category == "びわ（収穫予測）":
-  inputs["variety"] = st.sidebar.selectbox(
-      "品種", list(LOQUAT_VARIETY_OFFSETS.keys())
-  )
-  inputs["start_date"] = st.sidebar.date_input(
-      "開花終期（起算日）", value=datetime.date(current_year, 12, 10)
-  )
-
-elif crop_category == "ナシマルカイガラムシ（露地ビワ）":
-  inputs["target_year"] = st.sidebar.selectbox(
-      "予測年", [current_year - 1, current_year, current_year + 1], index=1
-  )
-
-elif crop_category == "レタス（収穫予測）":
-  inputs["planting_date"] = st.sidebar.date_input(
-      "定植日", value=datetime.date(current_year, 10, 15)
-  )
-  inputs["use_covering"] = st.sidebar.checkbox("被覆を行う", value=True)
-  if inputs["use_covering"]:
-    inputs["covering_date"] = st.sidebar.date_input(
-        "被覆日", value=datetime.date(current_year, 12, 1)
+  # 品目ごとの動的入力フォーム
+  if crop_category == "水稲":
+    inputs["variety"] = st.selectbox(
+        "品種", list(RICE_VARIETY_PARAMS.keys())
     )
-  else:
-    inputs["covering_date"] = None
-  inputs["target_diameter"] = st.sidebar.number_input(
-      "目標玉径 (cm)", min_value=5.0, max_value=25.0, value=15.0, step=0.5
-  )
-  inputs["model_type"] = st.sidebar.selectbox(
-      "収穫モデル", ["11・12月モデル", "1月モデル", "2月モデル"]
-  )
+    inputs["start_date"] = st.date_input(
+        "移植日（田植え日）", value=datetime.date(current_year, 4, 15)
+    )
 
-st.sidebar.divider()
-run_prediction = st.sidebar.button(
-    "🚀 生育・発生予測を実行", type="primary", use_container_width=True
-)
+  elif crop_category == "麦":
+    inputs["variety"] = st.selectbox(
+        "品種", list(WHEAT_VARIETY_PARAMS.keys())
+    )
+    inputs["start_date"] = st.date_input(
+        "調査日", value=datetime.date(current_year, 2, 1)
+    )
+    inputs["young_spike_length"] = st.number_input(
+        "主稈幼穂長 (cm)", min_value=0.1, value=1.0, step=0.1
+    )
+
+  elif crop_category == "タマネギべと病":
+    inputs["start_date"] = st.date_input(
+        "定植日", value=datetime.date(current_year, 12, 5)
+    )
+
+  elif crop_category == "バレイショ（春作マルチ）":
+    inputs["variety"] = st.selectbox(
+        "品種", list(POTATO_VARIETY_PARAMS.keys())
+    )
+    inputs["start_date"] = st.date_input(
+        "出芽日", value=datetime.date(current_year, 2, 25)
+    )
+
+  elif crop_category == "びわ（収穫予測）":
+    inputs["variety"] = st.selectbox(
+        "品種", list(LOQUAT_VARIETY_OFFSETS.keys())
+    )
+    inputs["start_date"] = st.date_input(
+        "開花終期（起算日）", value=datetime.date(current_year, 12, 10)
+    )
+
+  elif crop_category == "ナシマルカイガラムシ（露地ビワ）":
+    inputs["target_year"] = st.selectbox(
+        "予測年", [current_year - 1, current_year, current_year + 1], index=1
+    )
+
+  elif crop_category == "レタス（収穫予測）":
+    inputs["planting_date"] = st.date_input(
+        "定植日", value=datetime.date(current_year, 10, 15)
+    )
+    inputs["use_covering"] = st.checkbox("被覆を行う", value=True)
+    if inputs["use_covering"]:
+      inputs["covering_date"] = st.date_input(
+          "被覆日", value=datetime.date(current_year, 12, 1)
+      )
+    else:
+      inputs["covering_date"] = None
+    inputs["target_diameter"] = st.number_input(
+        "目標玉径 (cm)", min_value=5.0, max_value=25.0, value=15.0, step=0.5
+    )
+    inputs["model_type"] = st.selectbox(
+        "収穫モデル", ["11・12月モデル", "1月モデル", "2月モデル"]
+    )
+
+  st.divider()
+  # フォーム内の送信ボタン
+  run_prediction = st.form_submit_button(
+      "🚀 生育・発生予測を実行", type="primary"
+  )
 
 # ---------------------------------------------------------
 # メインタイトル
