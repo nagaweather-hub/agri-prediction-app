@@ -93,7 +93,7 @@ st.sidebar.header("⚙️ 条件設定")
 
 current_year = datetime.date.today().year
 
-# 品目ごとの動的入力フォーム（即時切り替え対応）
+# 品目ごとの動的入力フォーム
 inputs = {}
 if crop_category == "水稲":
   inputs["variety"] = st.sidebar.selectbox(
@@ -152,7 +152,7 @@ elif crop_category == "レタス（収穫予測）":
   else:
     inputs["covering_date"] = None
   inputs["target_diameter"] = st.sidebar.number_input(
-        "目標玉径 (cm)", min_value=5.0, max_value=25.0, value=15.0, step=0.5
+      "目標玉径 (cm)", min_value=5.0, max_value=25.0, value=15.0, step=0.5
   )
   inputs["model_type"] = st.sidebar.selectbox(
       "収穫モデル", ["11・12月モデル", "1月モデル", "2月モデル"]
@@ -295,8 +295,8 @@ if run_prediction:
         )
       elif crop_category == "びわ（収穫予測）":
         result = predict_loquat_growth(
-            lat, lon, inputs["variety"], start_dt, weather_data, inputs["variety"]
-        ) # ※元の関数定義に合わせて引数を調整
+            lat, lon, inputs["variety"], start_dt, weather_data
+        )
       elif crop_category == "ナシマルカイガラムシ（露地ビワ）":
         result = predict_scale_insect_peak(lat, lon, target_y, weather_data)
       elif crop_category == "レタス（収穫予測）":
@@ -455,7 +455,7 @@ if run_prediction:
             value=(
                 harvest_date.strftime("%Y/%m/%d")
                 if harvest_date
-                else "期間날未到達"
+                else "期間内未到達"
             ),
         )
         col_sub1, col_sub2 = st.columns(2)
