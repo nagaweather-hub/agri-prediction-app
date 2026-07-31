@@ -260,6 +260,10 @@ st.divider()
 if run_prediction:
   lat = st.session_state["lat"]
   lon = st.session_state["lon"]
+print(
+      f"📍 現在使われている予測地点 -> 緯度: {lat}, 経度: {lon} (場所名:"
+      f" {st.session_state.get('location_label', '')})"
+  )
 
   with st.spinner("Google Cloudから気象データ（予報値・平年値）を取得してシミュレーション中..."):
     # 品目ごとに適切な予測期間（日数）を設定
