@@ -2,7 +2,7 @@
 """
 総合農業予測システム (app.py)
 水稲, 麦, タマネギべと病, バレイショ, びわ, ナシマルカイガラムシ, レタス の予測を統合
-（メイン画面上部に条件設定を配置したスマホ最適化バージョン）
+（気象データデバッグ確認機能付き）
 """
 
 import datetime
@@ -36,7 +36,7 @@ st.set_page_config(
     page_title="総合農業予測システム",
     page_icon="🌱",
     layout="wide",
-    initial_sidebar_state="collapsed",  # サイドバーは最初から折りたたむ
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -285,10 +285,22 @@ if run_prediction:
       end_dt = datetime.date(target_y, 8, 31)
     elif crop_category == "レタス（収穫予測）":
       start_dt = inputs["planting_date"]
-      end_dt = start_dt + datetime.timedelta(days=240)  # 約8ヶ月先まで
+      end_dt = start_dt + datetime.timedelta(days=240)
 
     # 気象データを取得（年またぎ自動分割対応）
     weather_data = fetch_real_weather_dict("", "", lat, lon, start_dt, end_dt)
+
+    # ---------------------------------------------------------
+    # デバッグ用：取得した気象データの中身を表示
+    # ---------------------------------------------------------
+    st.write("--- 🔍 【デバッグ】APIから取得した気象データの中身 ---")
+    st.write(f"取得データ日数（レコード数）: {len(weather_data) if weather_data else 0}")
+    if weather_data:
+      debug_df = pd.DataFrame(weather_data).T
+      st.dataframe(debug_df.head(15))  # 最初から15日分を表形式で表示
+    else:
+      st.warning("⚠️ 気象データが空（取得失敗）になっています。")
+    st.write("--------------------------------------------------")
 
     if not weather_data:
       result = {
