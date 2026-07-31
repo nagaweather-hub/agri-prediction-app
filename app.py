@@ -2,7 +2,6 @@
 """
 総合農業予測システム (app.py)
 水稲, 麦, タマネギべと病, バレイショ, びわ, ナシマルカイガラムシ, レタス の予測を統合
-（気象データデバッグ確認機能付き）
 """
 
 import datetime
@@ -291,15 +290,26 @@ if run_prediction:
     weather_data = fetch_real_weather_dict("", "", lat, lon, start_dt, end_dt)
 
     # ---------------------------------------------------------
-    # デバッグ用：取得した気象データの中身を表示
+    # デバッグ用：安全に気象データの中身を表示
     # ---------------------------------------------------------
     st.write("--- 🔍 【デバッグ】APIから取得した気象データの中身 ---")
-    st.write(f"取得データ日数（レコード数）: {len(weather_data) if weather_data else 0}")
-    if weather_data:
-      debug_df = pd.DataFrame(weather_data).T
-      st.dataframe(debug_df.head(15))  # 最初から15日分を表形式で表示
+    st.write(
+        f"取得データ日数（レコード数）: {len(weather_data) if weather_data else 0}"
+    )
+    if weather_data and isinstance(weather_data, dict):
+      # 辞書データを安全にDataFrameに変換
+      debug_rows = []
+      for date_key, vals in list(weather_data.items())[:15]:  # 最初から15日分
+        row = {"date": date_key}
+        if isinstance(vals, dict):
+          row.update(vals)
+        else:
+          row["value"] = vals
+        debug_rows.append(row)
+      debug_df = pd.DataFrame(debug_rows)
+      st.dataframe(debug_df)
     else:
-      st.warning("⚠️ 気象データが空（取得失敗）になっています。")
+      st.warning("⚠️ 気象データが空、または予期せぬ形式です。")
     st.write("--------------------------------------------------")
 
     if not weather_data:
