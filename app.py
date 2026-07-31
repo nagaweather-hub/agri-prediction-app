@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-総合農業予測システム (app.py)
-水稲, 麦, タマネギべと病, バレイショ, びわ, ナシマルカイガラムシ, レタス の予測を統合
+総合農業予測システム (app.py) - 安定版
+水稲, 麦, タマネギべと病, バレイショ, びわ, ナシマルカイガラムシ, 레タス の予測を統合
 """
 
 import datetime
-import folium
 from geopy.geocoders import Nominatim
 import pandas as pd
 import streamlit as st
-from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 
 # 各種予測モジュールのインポート
@@ -76,7 +74,7 @@ if "lat" not in st.session_state or "lon" not in st.session_state:
 # ---------------------------------------------------------
 st.title("🌾 総合農業生育・病害虫予測システム")
 st.markdown(
-    "上から順番に条件を設定し、地図で地点を選んで「予測を実行」ボタンを押してください。"
+    "上から順番に条件を設定し、地点（緯度・経度）を確認・調整して「予測を実行」ボタンを押してください。"
 )
 st.divider()
 
@@ -186,11 +184,12 @@ elif crop_category == "レタス（収穫予測）":
 st.divider()
 
 # ---------------------------------------------------------
-# メイン画面：地点選択エリア（住所検索 ＆ 大きな地図）
+# メイン画面：地点選択エリア（住所検索 ＆ 座標直接設定・安定版）
 # ---------------------------------------------------------
-st.subheader("📍 2. 予測地点の選択")
+st.subheader("📍 2. 予測地点の設定（緯度・経度）")
 
-col_search, col_info = st.columns([2, 1])
+col_search, col_lat, col_lon = st.columns([2, 1, 1])
+
 with col_search:
     input_address = st.text_input(
         "町単位の住所・地名で検索", value=st.session_state["location_label"]
@@ -209,39 +208,20 @@ with col_search:
                     "❌ 見つかりませんでした。少し広めの地名でお試しください。"
                 )
 
-with col_info:
-    st.markdown(f"**現在の設定地**")
-    st.text(
-        f"緯度: {st.session_state['lat']:.4f}\n経度:"
-        f" {st.session_state['lon']:.4f}"
+with col_lat:
+    st.session_state["lat"] = st.number_input(
+        "緯度", value=float(st.session_state["lat"]), format="%.4f", step=0.001
     )
 
-# 地図の表示
-st.markdown("👇 **地図上をクリックすると、その場所が選択されます**")
-m = folium.Map(
-    location=[st.session_state["lat"], st.session_state["lon"]], zoom_start=14
+with col_lon:
+    st.session_state["lon"] = st.number_input(
+        "経度", value=float(st.session_state["lon"]), format="%.4f", step=0.001
+    )
+
+st.info(
+    f"📍 現在選択中の予測地点 → 緯度: {st.session_state['lat']:.4f} / 経度:"
+    f" {st.session_state['lon']:.4f}"
 )
-folium.Marker(
-    [st.session_state["lat"], st.session_state["lon"]],
-    popup=st.session_state["location_label"],
-    icon=folium.Icon(color="green", icon="info-sign"),
-).add_to(m)
-
-map_data = st_folium(m, width="100%", height=350, key="main_map")
-
-if map_data and map_data.get("last_clicked"):
-    clicked_lat = map_data["last_clicked"]["lat"]
-    clicked_lon = map_data["last_clicked"]["lng"]
-    if (
-        clicked_lat != st.session_state["lat"]
-        or clicked_lon != st.session_state["lon"]
-    ):
-        st.session_state["lat"] = clicked_lat
-        st.session_state["lon"] = clicked_lon
-        st.session_state["location_label"] = (
-            f"緯度:{clicked_lat:.4f}, 経度:{clicked_lon:.4f}"
-        )
-        st.rerun()
 
 st.divider()
 
@@ -309,10 +289,8 @@ if run_prediction:
                 debug_rows.append(row)
             debug_df = pd.DataFrame(debug_rows)
 
-            # 画面上で縦長に全データを見られる表（高さ400pxでスクロール可能）
             st.dataframe(debug_df, use_container_width=True, height=400)
 
-            # CSVダウンロードボタンを追加
             csv_data = debug_df.to_csv(index=False).encode("utf-8")
             st.download_button(
                 label="📥 取得した気象データ（CSV）をダウンロード",
@@ -371,7 +349,7 @@ if run_prediction:
         else:
             st.success("✅ 予測が完了しました！")
             st.subheader(
-                f"📊 予測結果：{st.session_state['location_label']} （{crop_category}）"
+                f"📊 予測結果：{input_address} （緯度:{lat:.4f}, 経度:{lon:.4f} / {crop_category}）"
             )
 
             # 品目ごとの表示切り替え
