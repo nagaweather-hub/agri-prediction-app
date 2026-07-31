@@ -290,16 +290,15 @@ if run_prediction:
     weather_data = fetch_real_weather_dict("", "", lat, lon, start_dt, end_dt)
 
     # ---------------------------------------------------------
-    # デバッグ用：安全に気象データの中身を表示
+    # デバッグ用：全期間の気象データを表＆CSVダウンロードで確認
     # ---------------------------------------------------------
-    st.write("--- 🔍 【デバッグ】APIから取得した気象データの中身 ---")
+    st.write("--- 🔍 【デバッグ】APIから取得した気象データ（全期間） ---")
     st.write(
         f"取得データ日数（レコード数）: {len(weather_data) if weather_data else 0}"
     )
     if weather_data and isinstance(weather_data, dict):
-      # 辞書データを安全にDataFrameに変換
       debug_rows = []
-      for date_key, vals in list(weather_data.items())[:15]:  # 最初から15日分
+      for date_key, vals in weather_data.items():
         row = {"date": date_key}
         if isinstance(vals, dict):
           row.update(vals)
@@ -307,7 +306,18 @@ if run_prediction:
           row["value"] = vals
         debug_rows.append(row)
       debug_df = pd.DataFrame(debug_rows)
-      st.dataframe(debug_df)
+
+      # 画面上で縦長に全データを見られる表（高さ400pxでスクロール可能）
+      st.dataframe(debug_df, use_container_width=True, height=400)
+
+      # CSVダウンロードボタンを追加
+      csv_data = debug_df.to_csv(index=False).encode("utf-8")
+      st.download_button(
+          label="📥 取得した気象データ（CSV）をダウンロード",
+          data=csv_data,
+          file_name=f"weather_debug_{crop_category}.csv",
+          mime="text/csv",
+      )
     else:
       st.warning("⚠️ 気象データが空、または予期せぬ形式です。")
     st.write("--------------------------------------------------")
