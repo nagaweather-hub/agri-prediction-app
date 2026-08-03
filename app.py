@@ -186,7 +186,7 @@ if run_prediction:
     lat = st.session_state["lat"]
     lon = st.session_state["lon"]
 
-    with st.spinner("気象 데이터를取得してシミュレーション中..."):
+    with st.spinner("気象データを取得してシミュレーション中..."):
         if crop_category == "水稲":
             start_dt = inputs["start_date"]
             end_dt = start_dt + datetime.timedelta(days=220)
