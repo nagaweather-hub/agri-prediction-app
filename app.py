@@ -2,7 +2,7 @@
 """
 総合農業予測システム (app.py)
 水稲, 麦, タマネギべと病, バレイショ, びわ, ナシマルカイガラムシ, レタス の予測を統合
-（縦型スクロールで直感的に操作できるシンプルバージョン - CSVダウンロード機能付き）
+（縦型スクロールで直感的に操作できるシンプルバージョン - 現在地取得ボタン・CSVダウンロード機能付き）
 """
 
 import datetime
@@ -131,11 +131,27 @@ elif crop_category == "レタス（収穫予測）":
 st.markdown("---")
 
 # ---------------------------------------------------------
-# 3. 予測地点の設定（住所検索 ＆ 地図）
+# 3. 予測地点の設定（現在地ボタン ＆ 住所検索 ＆ 地図）
 # ---------------------------------------------------------
 st.subheader("📍 3. 予測地点の設定")
 
+# 2カラムで「現在地を取得」ボタンと「住所検索」を配置
+col_gps, col_addr_btn = st.columns([1, 1])
+
+with col_gps:
+    if st.button("📍 現在地を取得して反映", use_container_width=True):
+        loc = get_geolocation()
+        if loc and "coords" in loc:
+            st.session_state["lat"] = loc["coords"]["latitude"]
+            st.session_state["lon"] = loc["coords"]["longitude"]
+            st.session_state["location_label"] = f"現在地 (緯度:{st.session_state['lat']:.4f}, 経度:{st.session_state['lon']:.4f})"
+            st.success("現在地を取得しました！")
+            st.rerun()
+        else:
+            st.error("❌ 現在地を取得できませんでした。ブラウザの位置情報権限をご確認ください。")
+
 input_address = st.text_input("町単位の住所・地名で検索", value=st.session_state["location_label"])
+
 if st.button("🔍 住所から位置を反映"):
     with st.spinner("住所を検索中..."):
         lat_res, lon_res = get_lat_lon_from_address(input_address)
@@ -186,7 +202,7 @@ if run_prediction:
     lat = st.session_state["lat"]
     lon = st.session_state["lon"]
 
-    with st.spinner("気象データを取得してシミュレーション中..."):
+    with st.spinner("気象データを取得してシミュレーションしています..."):
         if crop_category == "水稲":
             start_dt = inputs["start_date"]
             end_dt = start_dt + datetime.timedelta(days=220)
