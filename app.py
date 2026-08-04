@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 総合農業予測システム (app.py)
-水稲, 麦, タマネギべと病, バレイショ, びわ, ナシマルカイガラムシ, レタス の予測を統合
+水稲, 麦, タマネギべと病, バレイショ, びわ, ナシマルカイガラムシ, レタス, チャノキイロアザミウマ の予測を統合
 （縦型スクロールで直感的に操作できるシンプルバージョン - 現在地取得ボタン・CSVダウンロード機能付き）
 """
 
@@ -22,6 +22,7 @@ from modules.potato_predictor import predict_potato_growth, POTATO_VARIETY_PARAM
 from modules.loquat_predictor import predict_loquat_growth, LOQUAT_VARIETY_OFFSETS
 from modules.scale_insect_predictor import predict_scale_insect_peak
 from modules.lettuce_predictor import calculate_lettuce_harvest
+from modules.thrips_prediction import predict_thrips_generations  # ★スリップス予測モジュールのインポート
 
 # ---------------------------------------------------------
 # ページ基本設定
@@ -84,6 +85,7 @@ crop_category = st.selectbox(
         "びわ（収穫予測）",
         "ナシマルカイガラムシ（露地ビワ）",
         "レタス（収穫予測）",
+        "チャノキイロアザミウマ（スリップス）",  # ★選択肢に追加
     ],
 )
 
@@ -128,6 +130,9 @@ elif crop_category == "レタス（収穫予測）":
         inputs["covering_date"] = None
     inputs["target_diameter"] = st.number_input("目標玉径 (cm)", min_value=5.0, max_value=25.0, value=15.0, step=0.5)
 
+elif crop_category == "チャノキイロアザミウマ（スリップス）":
+    inputs["target_year"] = st.selectbox("予測対象年", [current_year - 1, current_year, current_year + 1], index=1)
+
 st.markdown("---")
 
 # ---------------------------------------------------------
@@ -135,7 +140,6 @@ st.markdown("---")
 # ---------------------------------------------------------
 st.subheader("📍 3. 予測地点の設定")
 
-# 2カラムで「現在地を取得」ボタンと「住所検索」を配置
 col_gps, col_addr_btn = st.columns([1, 1])
 
 with col_gps:
@@ -225,6 +229,10 @@ if run_prediction:
         elif crop_category == "レタス（収穫予測）":
             start_dt = inputs["planting_date"]
             end_dt = start_dt + datetime.timedelta(days=240)
+        elif crop_category == "チャノキイロアザミウマ（スリップス）":
+            target_y = inputs["target_year"]
+            start_dt = datetime.date(target_y, 1, 1)
+            end_dt = datetime.date(target_y, 12, 31)
 
         # 気象データを取得
         weather_data = fetch_real_weather_dict("", "", lat, lon, start_dt, end_dt)
@@ -246,6 +254,10 @@ if run_prediction:
                 result = predict_scale_insect_peak(lat, lon, target_y, weather_data)
             elif crop_category == "レタス（収穫予測）":
                 result = calculate_lettuce_harvest(weather_data, inputs["planting_date"], inputs["covering_date"], inputs["target_diameter"], inputs["model_type"])
+            elif crop_category == "チャノキイロアザミウマ（スリップス）":
+                # スリップス予測の実行
+                thrips_results = predict_thrips_generations(target_y, weather_data)
+                result = {"generations": thrips_results}
 
     # 結果の描画
     if "error" in result:
@@ -303,6 +315,17 @@ if run_prediction:
             st.text(f"目標積算温度: {result.get('target_accumulated_temp', 0):.1f} ℃")
             st.text(f"到達時積算温度: {result.get('actual_accumulated_temp', 0):.1f} ℃")
 
+        elif crop_category == "チャノキイロアザミウマ（スリップス）":
+            thrips_gens = result.get("generations", [])
+            if thrips_gens:
+                st.markdown("### 🐛 各世代の発生予測到達日一覧")
+                # 表形式で分かりやすく表示
+                gen_df = pd.DataFrame(thrips_gens)
+                gen_df["到達日"] = pd.to_datetime(gen_df["到達日"]).dt.strftime('%Y/%m/%d')
+                st.dataframe(gen_df, use_container_width=True)
+            else:
+                st.info("指定された期間内で目標積算温度に到達した世代はありませんでした。")
+
         # ---------------------------------------------------------
         # 📥 気象データのCSVダウンロード機能
         # ---------------------------------------------------------
@@ -311,18 +334,14 @@ if run_prediction:
         st.markdown("今回の予測計算で使用した期間の気象データ（日付・日平均気温）をCSVファイルとしてダウンロードできます。お手元のデータと比較してみてください。")
 
         if weather_data and isinstance(weather_data, dict):
-            # 辞書データをpandasのDataFrameに変換
             weather_df = pd.DataFrame(list(weather_data.items()), columns=["日付", "日平均気温(℃)"])
             weather_df["日付"] = pd.to_datetime(weather_df["日付"]).dt.date
             weather_df = weather_df.sort_values("日付").reset_index(drop=True)
 
-            # データフレームのプレビュー表示
             st.dataframe(weather_df, use_container_width=True, height=200)
 
-            # CSVに変換
             csv_data = weather_df.to_csv(index=False, encoding="utf-8-sig")
 
-            # ダウンロードボタン
             st.download_button(
                 label="📥 気象データCSVをダウンロード",
                 data=csv_data,

@@ -59,10 +59,25 @@ def fetch_raw_chunk(userid, auth_key, lat, lon, start_date, end_date):
 
     for t_val, tmp_val in zip(time_data, tmp_data):
       date_key = base_date + datetime.timedelta(days=int(t_val))
-      if isinstance(tmp_val, list):
-        actual_temp = tmp_val[0][0] if isinstance(tmp_val[0], list) else tmp_val[0]
-      else:
-        actual_temp = tmp_val
+
+      # 🔽 リスト構造（[[数値]]など）から確実に取り出して数値（float）に変換する処理
+      try:
+        if isinstance(tmp_val, list):
+          val = tmp_val[0]
+          while isinstance(val, list):
+            val = val[0]
+          actual_temp = float(val)
+        else:
+          actual_temp = float(tmp_val)
+      except (IndexError, TypeError, ValueError):
+        actual_temp = 0.0
+
+      # デバッグ確認用（必要に応じて残してあります）
+      print(
+          f"DEBUG: t_val={t_val} -> 計算された日付={date_key},"
+          f" 変換後温度={actual_temp}"
+      )
+
       formatted_weather[date_key] = actual_temp
 
     return formatted_weather
@@ -81,18 +96,14 @@ def fetch_real_weather_dict(
   """
   combined_weather = {}
 
-  # 1. まず「年をまたがない小分けの期間（chunk_days単位）」のリストを作成するが、
-  #    さらに「年の境界（12月31日と1月1日など）」で確実に分割されるようにする。
   current_start = start_date
   sub_ranges = []
 
   while current_start <= end_date:
-    # チャンクの仮の終了日
     potential_end = min(
         current_start + datetime.timedelta(days=chunk_days - 1), end_date
     )
 
-    # 【重要】もし「年（Year）」が途中で変わる場合は、その年の大晦日（12月31日）で強制的に区切る
     if current_start.year != potential_end.year:
       chunk_end = datetime.date(current_start.year, 12, 31)
     else:
@@ -101,7 +112,6 @@ def fetch_real_weather_dict(
     sub_ranges.append((current_start, chunk_end))
     current_start = chunk_end + datetime.timedelta(days=1)
 
-  # 2. 分割されたそれぞれの期間ごとにAPIを叩いてデータを集約する
   for s_date, e_date in sub_ranges:
     chunk_data = fetch_raw_chunk(userid, auth_key, lat, lon, s_date, e_date)
     if chunk_data:

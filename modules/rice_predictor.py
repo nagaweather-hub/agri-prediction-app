@@ -57,87 +57,102 @@ RICE_VARIETY_PARAMS = {
 
 
 def calculate_daylight_hours(latitude, date):
-  day_of_year = date.timetuple().tm_yday
-  lat_rad = math.radians(latitude)
-  declination = math.radians(
-      23.45 * math.sin(2 * math.pi * (284 + day_of_year) / 365.0)
-  )
-  cos_h0 = -math.tan(lat_rad) * math.tan(declination)
-  if cos_h0 >= 1.0:
-    return 0.0
-  if cos_h0 <= -1.0:
-    return 24.0
-  h0 = math.acos(cos_h0)
-  return 2 * math.degrees(h0) / 15.0
+    day_of_year = date.timetuple().tm_yday
+    lat_rad = math.radians(latitude)
+    declination = math.radians(
+        23.45 * math.sin(2 * math.pi * (284 + day_of_year) / 365.0)
+    )
+    cos_h0 = -math.tan(lat_rad) * math.tan(declination)
+    if cos_h0 >= 1.0:
+        return 0.0
+    if cos_h0 <= -1.0:
+        return 24.0
+    h0 = math.acos(cos_h0)
+    return 2 * math.degrees(h0) / 15.0
 
 
 def predict_rice_growth(lat, lon, variety_name, transplant_date, weather_data):
-  """取得済みの気象データを使って水稲の生育ステージを予測する関数"""
-  if variety_name not in RICE_VARIETY_PARAMS:
-    return {"error": f"未定義の品種です: {variety_name}"}
+    """取得済みの気象データを使って水稲の生育ステージを予測する関数（Excel VBA完全一致版）"""
+    if variety_name not in RICE_VARIETY_PARAMS:
+        return {"error": f"未定義の品種です: {variety_name}"}
 
-  p = RICE_VARIETY_PARAMS[variety_name]
-  current_date = transplant_date
-  end_date = transplant_date + datetime.timedelta(days=150)
+    p = RICE_VARIETY_PARAMS[variety_name]
+    current_date = transplant_date
+    end_date = transplant_date + datetime.timedelta(days=150)
 
-  accumulated_dvi = 0.0
-  accumulated_temp = 0.0
+    accumulated_dvi = 0.0
+    accumulated_temp = 0.0
 
-  heading_date = None
-  nakaboshi_date = None
-  seijuku_date = None
-  found_heading = False
+    heading_date = None
+    nakaboshi_date = None
+    seijuku_date = None
+    found_heading = False
+    has_nakaboshi_date = False
 
-  while current_date <= end_date:
-    t = weather_data.get(current_date)
-    if t is None:
-      current_date += datetime.timedelta(days=1)
-      continue
+    while current_date <= end_date:
+        t = weather_data.get(current_date)
+        if t is None:
+            current_date += datetime.timedelta(days=1)
+            continue
 
-    daylight = calculate_daylight_hours(lat, current_date)
+        daylight = calculate_daylight_hours(lat, current_date)
 
-    if not found_heading:
-      if p["has_p"]:
-        dvr = p["x1"] + (p["x2"] * t) + (p["x3"] * daylight)
-      else:
-        dvr = p["x1"] + (p["x2"] * t)
+        # 1. DVR計算とDVI積算（出穂するまで）
+        if not found_heading:
+            if p["has_p"]:
+                dvr = p["x1"] + (p["x2"] * t) + (p["x3"] * daylight)
+            else:
+                dvr = p["x1"] + (p["x2"] * t)
 
-      dvr = max(0.0, dvr)
-      accumulated_dvi += dvr
+            dvr = max(0.0, dvr)
+            accumulated_dvi += dvr
 
-      if (
-          p["nakaboshi_dvi"] is not None
-          and nakaboshi_date is None
-          and accumulated_dvi >= p["nakaboshi_dvi"]
-      ):
-        nakaboshi_date = current_date
+            # 中干し開始日の判定
+            if (
+                p["nakaboshi_dvi"] is not None
+                and not has_nakaboshi_date
+                and accumulated_dvi >= p["nakaboshi_dvi"]
+            ):
+                nakaboshi_date = current_date
+                has_nakaboshi_date = True
 
-      if accumulated_dvi >= 1.0:
-        heading_date = current_date
-        found_heading = True
+            # 出穂日（DVI >= 1.0）の判定
+            if accumulated_dvi >= 1.0:
+                heading_date = current_date
+                found_heading = True
+
+        # 2. 出穂日以降の処理（成熟の積算）
+        if found_heading:
+            # 中干し期間中は積算停止するVBAのロジックを再現
+            if p["nakaboshi_dvi"] is not None:
+                if accumulated_dvi >= p["nakaboshi_dvi"] and accumulated_dvi < 1.0:
+                    current_date += datetime.timedelta(days=1)
+                    continue
+
+            # 出穂日の翌日から積算開始
+            if current_date > heading_date:
+                accumulated_temp += t
+
+            # 積算温度が閾値を超えたら成熟日
+            if seijuku_date is None and accumulated_temp >= p["seijuku_sum_temp"]:
+                seijuku_date = current_date
+                break
+
         current_date += datetime.timedelta(days=1)
-        continue
 
-    if found_heading:
-      accumulated_temp += t
-      if seijuku_date is None and accumulated_temp >= p["seijuku_sum_temp"]:
-        seijuku_date = current_date
-        break
+    # 穂肥日オフセット計算
+    hogoe_date = (
+        heading_date - datetime.timedelta(days=p["hogoe_days_before_heading"])
+        if heading_date
+        else None
+    )
 
-    current_date += datetime.timedelta(days=1)
-
-  hogoe_date = (
-      heading_date - datetime.timedelta(days=p["hogoe_days_before_heading"])
-      if heading_date
-      else None
-  )
-
-  return {
-      "variety": variety_name,
-      "transplant_date": transplant_date,
-      "nakaboshi_date": nakaboshi_date,
-      "hogoe_date": hogoe_date,
-      "heading_date": heading_date,
-      "seijuku_date": seijuku_date,
-      "enable_drainage": p["nakaboshi_dvi"] is not None,
-  }
+    return {
+        "variety": variety_name,
+        "transplant_date": transplant_date,
+        "nakaboshi_date": nakaboshi_date,
+        "hogoe_date": hogoe_date,
+        "heading_date": heading_date,
+        "seijuku_date": seijuku_date,
+        "enable_drainage": p["nakaboshi_dvi"] is not None,
+    }
